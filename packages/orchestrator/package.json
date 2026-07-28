@@ -1,0 +1,24 @@
+{
+  "name": "@product-forge/orchestrator",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./agents": "./src/agents.ts"
+  },
+  "scripts": {
+    "check": "tsc -b",
+    "test": "vitest run --exclude \"dist/**\""
+  },
+  "dependencies": {
+    "@langchain/core": "^1.2.3",
+    "@langchain/langgraph": "^1.4.8",
+    "@product-forge/contracts": "1.0.0",
+    "zod": "^4.4.3"
+  },
+  "devDependencies": {
+    "typescript": "^7.0.2",
+    "vitest": "^4.1.0"
+  }
+}

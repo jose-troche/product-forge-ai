@@ -1,0 +1,23 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "lib": ["ES2022", "WebWorker"],
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "exactOptionalPropertyTypes": true,
+    "verbatimModuleSyntax": true,
+    "skipLibCheck": true,
+    "noEmit": true,
+    "paths": {
+      "@product-forge/contracts": ["../../packages/contracts/src/index.ts"],
+      "@product-forge/orchestrator": ["../../packages/orchestrator/src/index.ts"]
+    }
+  },
+  "include": ["src", "worker-configuration.d.ts"],
+  "references": [
+    { "path": "../../packages/contracts" },
+    { "path": "../../packages/orchestrator" }
+  ]
+}

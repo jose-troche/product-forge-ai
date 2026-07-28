@@ -1,0 +1,26 @@
+{
+  "name": "@product-forge/api",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "wrangler dev --port 8787",
+    "check": "tsc --noEmit",
+    "types": "wrangler types worker-configuration.d.ts",
+    "deploy": "wrangler deploy --minify",
+    "deploy:dry": "wrangler deploy --dry-run",
+    "db:migrate:local": "wrangler d1 migrations apply product-forge-ai --local",
+    "db:migrate:remote": "wrangler d1 migrations apply product-forge-ai --remote"
+  },
+  "dependencies": {
+    "@product-forge/contracts": "1.0.0",
+    "@product-forge/orchestrator": "1.0.0",
+    "hono": "^4.12.32",
+    "zod": "^4.4.3"
+  },
+  "devDependencies": {
+    "@types/node": "^26.1.2",
+    "typescript": "^7.0.2",
+    "wrangler": "^4.114.0"
+  }
+}

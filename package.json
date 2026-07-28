@@ -1,0 +1,29 @@
+{
+  "name": "product-forge-ai",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "build": "npm run build -w @product-forge/web",
+    "check": "npm run types && npm run check -w @product-forge/contracts && npm run check -w @product-forge/orchestrator && npm run check -w @product-forge/api && npm run check -w @product-forge/web",
+    "dev": "npm run dev -w @product-forge/api",
+    "dev:web": "npm run dev -w @product-forge/web",
+    "dev:api": "npm run dev -w @product-forge/api",
+    "test": "npm run test --workspaces --if-present",
+    "types": "npm run types -w @product-forge/api",
+    "deploy": "npm run build && npm run deploy -w @product-forge/api",
+    "deploy:dry": "npm run build && npm run deploy:dry -w @product-forge/api",
+    "db:migrate:local": "npm run db:migrate:local -w @product-forge/api",
+    "db:migrate:remote": "npm run db:migrate:remote -w @product-forge/api"
+  },
+  "engines": {
+    "node": ">=22.0.0"
+  },
+  "devDependencies": {
+    "typescript": "^7.0.2"
+  }
+}

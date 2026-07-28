@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "wrangler dev --port 8787",
     "check": "tsc --noEmit",
+    "test": "vitest run --exclude \"dist/**\"",
     "types": "wrangler types worker-configuration.d.ts",
     "deploy": "wrangler deploy --minify",
     "deploy:dry": "wrangler deploy --dry-run",
@@ -21,6 +22,7 @@
   "devDependencies": {
     "@types/node": "^26.1.2",
     "typescript": "^7.0.2",
+    "vitest": "^4.1.0",
     "wrangler": "^4.114.0"
   }
 }

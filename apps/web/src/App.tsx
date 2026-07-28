@@ -1,7 +1,19 @@
 import type { AgentId, OrchestrationEvent, ProductInput, Project } from "@product-forge/contracts";
+import { agentDefinitions } from "@product-forge/orchestrator/agents";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { Boxes, CircleDot, Clock3, CodeXml, FolderClock, RotateCcw, Sparkles, Zap } from "lucide-react";
-import { useCallback, useMemo, useState } from "react";
+import {
+  Boxes,
+  Check,
+  CircleDot,
+  Clock3,
+  CodeXml,
+  FolderClock,
+  LoaderCircle,
+  RotateCcw,
+  Sparkles,
+  Zap,
+} from "lucide-react";
+import { useCallback, useMemo, useRef, useState } from "react";
 import { AgentGraph, deriveStatuses } from "./components/AgentGraph";
 import { ExecutionTimeline } from "./components/ExecutionTimeline";
 import { ForgeForm } from "./components/ForgeForm";
@@ -21,6 +33,13 @@ function getSessionId(): string {
 }
 
 type Brief = Omit<ProductInput, "sessionId">;
+type RetryNotice = {
+  agentId: AgentId;
+  kind: "running" | "success" | "error";
+  message: string;
+};
+
+const agentNames = new Map(agentDefinitions.map((agent) => [agent.id, agent.name]));
 
 export default function App() {
   const sessionId = useMemo(getSessionId, []);
@@ -33,6 +52,9 @@ export default function App() {
   const [recentOpen, setRecentOpen] = useState(false);
   const [loadingProjectId, setLoadingProjectId] = useState<string | null>(null);
   const [retryingAgentId, setRetryingAgentId] = useState<AgentId | null>(null);
+  const [retryNotice, setRetryNotice] = useState<RetryNotice | null>(null);
+  const requestVersionRef = useRef(0);
+  const activeRequestRef = useRef<AbortController | null>(null);
   const { statuses, latencies, errors } = useMemo(
     () => deriveStatuses(events, project?.agents),
     [events, project?.agents],
@@ -44,27 +66,53 @@ export default function App() {
     staleTime: 10_000,
   });
 
+  const resetWorkspace = useCallback(() => {
+    requestVersionRef.current += 1;
+    activeRequestRef.current?.abort();
+    activeRequestRef.current = null;
+    setEvents([]);
+    setProject(null);
+    setRunning(false);
+    setStartedAt(null);
+    setError(null);
+    setRetryingAgentId(null);
+    setRetryNotice(null);
+  }, []);
+
   const runForge = async (brief: Brief) => {
+    activeRequestRef.current?.abort();
+    const controller = new AbortController();
+    const requestVersion = requestVersionRef.current + 1;
+    requestVersionRef.current = requestVersion;
+    activeRequestRef.current = controller;
     setRunning(true);
     setStartedAt(Date.now());
     setEvents([]);
     setProject(null);
     setError(null);
+    setRetryNotice(null);
 
     try {
       const completed = await forgeProject(
         { ...brief, sessionId },
         (event) => {
+          if (requestVersionRef.current !== requestVersion) return;
           setEvents((current) => [...current, event]);
           if (event.type === "project.completed") setProject(event.project);
         },
+        controller.signal,
       );
+      if (requestVersionRef.current !== requestVersion) return;
       setProject(completed);
       await queryClient.invalidateQueries({ queryKey: ["projects", sessionId] });
     } catch (cause) {
+      if (controller.signal.aborted || requestVersionRef.current !== requestVersion) return;
       setError(cause instanceof Error ? cause.message : "The forge run failed.");
     } finally {
-      setRunning(false);
+      if (requestVersionRef.current === requestVersion) {
+        setRunning(false);
+        activeRequestRef.current = null;
+      }
     }
   };
 
@@ -76,6 +124,7 @@ export default function App() {
       setProject(saved);
       setEvents([]);
       setStartedAt(null);
+      setRetryNotice(null);
       setRecentOpen(false);
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "Could not open the saved project.");
@@ -87,19 +136,36 @@ export default function App() {
   const retryAgent = useCallback(
     async (agentId: AgentId) => {
       if (!project || running || retryingAgentId) return;
+      activeRequestRef.current?.abort();
+      const controller = new AbortController();
+      const requestVersion = requestVersionRef.current + 1;
+      requestVersionRef.current = requestVersion;
+      activeRequestRef.current = controller;
       const at = new Date().toISOString();
+      const agentName = agentNames.get(agentId) ?? agentId;
       setRetryingAgentId(agentId);
       setError(null);
+      setRetryNotice({
+        agentId,
+        kind: "running",
+        message: `Retrying ${agentName}. Validating a fresh structured response (up to three attempts)…`,
+      });
       setEvents((current) => [
         ...current,
         { type: "agent.started", projectId: project.id, agentId, at },
       ]);
 
       try {
-        const updated = await retryProjectAgent(project.id, agentId, sessionId);
+        const updated = await retryProjectAgent(project.id, agentId, sessionId, controller.signal);
+        if (requestVersionRef.current !== requestVersion) return;
         const retried = updated.agents.find((agent) => agent.agentId === agentId);
         if (!retried) throw new Error("The retried agent output was not returned.");
         setProject(updated);
+        setRetryNotice({
+          agentId,
+          kind: "success",
+          message: `${agentName} completed successfully. The proposal has been refreshed.`,
+        });
         setEvents((current) => [
           ...current,
           {
@@ -116,8 +182,13 @@ export default function App() {
         ]);
         await queryClient.invalidateQueries({ queryKey: ["projects", sessionId] });
       } catch (cause) {
+        if (controller.signal.aborted || requestVersionRef.current !== requestVersion) return;
         const message = cause instanceof Error ? cause.message : "The agent retry failed.";
-        setError(message);
+        setRetryNotice({
+          agentId,
+          kind: "error",
+          message: `${agentName} retry failed: ${message}`,
+        });
         setEvents((current) => [
           ...current,
           {
@@ -129,7 +200,10 @@ export default function App() {
           },
         ]);
       } finally {
-        setRetryingAgentId(null);
+        if (requestVersionRef.current === requestVersion) {
+          setRetryingAgentId(null);
+          activeRequestRef.current = null;
+        }
       }
     },
     [project, queryClient, retryingAgentId, running, sessionId],
@@ -194,7 +268,11 @@ export default function App() {
             </div>
             <Sparkles className="size-4 text-[var(--lime)]/60" />
           </div>
-          <ForgeForm disabled={running} onSubmit={(brief) => void runForge(brief)} />
+          <ForgeForm
+            disabled={running}
+            onSubmit={(brief) => void runForge(brief)}
+            onBriefReplace={resetWorkspace}
+          />
         </section>
 
         <section className="panel graph-panel" aria-label="Agent orchestration">
@@ -226,12 +304,36 @@ export default function App() {
             />
           </div>
           <ExecutionTimeline events={events} startedAt={startedAt} running={running} />
+          {retryNotice && (
+            <div
+              className={`retry-notice is-${retryNotice.kind}`}
+              role="status"
+              aria-live="polite"
+            >
+              {retryNotice.kind === "running" ? (
+                <LoaderCircle className="size-3.5 shrink-0 animate-spin" />
+              ) : retryNotice.kind === "success" ? (
+                <Check className="size-3.5 shrink-0" />
+              ) : (
+                <RotateCcw className="size-3.5 shrink-0" />
+              )}
+              <span className="min-w-0 flex-1">{retryNotice.message}</span>
+              {retryNotice.kind !== "running" && (
+                <button
+                  type="button"
+                  className="shrink-0 text-[10px] uppercase tracking-wider opacity-60 hover:opacity-100"
+                  onClick={() => setRetryNotice(null)}
+                >
+                  Dismiss
+                </button>
+              )}
+            </div>
+          )}
           {error && (
             <div className="flex items-center gap-3 border-t border-red-300/15 bg-red-300/[.05] px-5 py-3 text-xs text-red-100">
               <span className="min-w-0 flex-1">{error}</span>
-              <Button variant="danger" size="sm" onClick={() => window.location.reload()}>
-                <RotateCcw className="size-3" />
-                Reset
+              <Button variant="danger" size="sm" onClick={() => setError(null)}>
+                Dismiss
               </Button>
             </div>
           )}

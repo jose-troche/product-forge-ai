@@ -11,7 +11,7 @@
 7. Agent results and the final proposal are written to D1 as one batch.
 8. The stream closes with the completed, typed project.
 
-A failed node can later be retried through `POST /api/projects/:id/agents/:agentId/retry`. The endpoint verifies session ownership, re-runs only that specialist, replaces its stored output, re-synthesizes all proposal sections, and updates the existing project rather than creating a duplicate.
+A failed node can later be retried through `POST /api/projects/:id/agents/:agentId/retry`. The endpoint verifies session ownership, re-runs only that specialist, replaces its stored output, re-synthesizes all proposal sections, and updates the existing project rather than creating a duplicate. Workers AI structured-output retries use a larger response allowance and progressively stricter brevity guidance to avoid repeating truncated JSON.
 
 ## Boundaries
 
@@ -24,7 +24,7 @@ This separation makes the model provider and hosting surface replaceable without
 
 ## Failure model
 
-Agent inference has three attempts with bounded exponential backoff. An exhausted AI quota, invalid JSON response, or model error affects only that specialist; the graph continues with a deterministic fallback and marks the project `partial`. Persistence failures fail the run because a proposal must not be reported as saved when it is not. The UI preserves all execution events so degraded output is visible rather than silently presented as AI-generated.
+Agent inference has three attempts with bounded exponential backoff. An exhausted AI quota, invalid JSON response, or model error affects only that specialist; the graph continues with a deterministic fallback and marks the project `partial`. Persistence failures fail the run because a proposal must not be reported as saved when it is not. The UI preserves all execution events so degraded output is visible rather than silently presented as AI-generated. Reset and preset actions cancel stale browser requests, clear the active graph and proposal, and return proposal navigation to Summary.
 
 ## Free-tier posture
 

@@ -14,7 +14,7 @@ import {
   Printer,
   Sparkles,
 } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { cn, formatDuration } from "../lib/utils";
@@ -214,9 +214,14 @@ export function ProposalPanel({
     [activeTab, proposal],
   );
 
+  useEffect(() => {
+    setActiveTab("executive");
+    setRaw(false);
+  }, [project?.id]);
+
   if (!proposal || !project || !section) {
     return (
-      <div className="grid h-full min-h-[520px] place-items-center px-8 text-center">
+      <div className="grid h-full min-h-0 place-items-center px-8 text-center">
         <div className="max-w-sm">
           <div className="mx-auto mb-6 grid size-16 place-items-center rounded-2xl border border-[var(--lime)]/20 bg-[var(--lime)]/[.06] shadow-[0_0_80px_rgba(216,255,95,.08)]">
             {loading ? (

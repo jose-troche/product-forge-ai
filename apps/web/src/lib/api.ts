@@ -25,11 +25,13 @@ async function errorMessage(response: Response): Promise<string> {
 export async function forgeProject(
   input: ProductInput,
   onEvent: (event: OrchestrationEvent) => void,
+  signal?: AbortSignal,
 ): Promise<Project> {
   const response = await fetch("/api/projects", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(input),
+    ...(signal ? { signal } : {}),
   });
 
   if (!response.ok) throw new Error(await errorMessage(response));
@@ -80,6 +82,7 @@ export async function retryProjectAgent(
   projectId: string,
   agentId: AgentId,
   sessionId: string,
+  signal?: AbortSignal,
 ): Promise<Project> {
   const response = await fetch(
     `/api/projects/${encodeURIComponent(projectId)}/agents/${encodeURIComponent(agentId)}/retry`,
@@ -87,6 +90,7 @@ export async function retryProjectAgent(
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ sessionId }),
+      ...(signal ? { signal } : {}),
     },
   );
   if (!response.ok) throw new Error(await errorMessage(response));

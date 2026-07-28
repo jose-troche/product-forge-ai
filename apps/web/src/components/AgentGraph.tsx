@@ -27,17 +27,34 @@ interface AgentNodeData extends Record<string, unknown> {
   status: AgentStatus;
   latencyMs?: number;
   error?: string;
+  retrying?: boolean;
   onRetry?: () => void;
   kind: "agent" | "orchestrator" | "synthesis";
 }
 
 type AgentFlowNode = Node<AgentNodeData, "agent">;
 
-function StatusIcon({ status }: { status: AgentStatus }) {
+function StatusIcon({ status, error }: { status: AgentStatus; error?: string | undefined }) {
   if (status === "running") return <LoaderCircle className="size-3.5 animate-spin text-[var(--lime)]" />;
   if (status === "completed") return <Check className="size-3.5 text-emerald-300" />;
-  if (status === "degraded" || status === "failed")
-    return <CircleAlert className={cn("size-3.5", status === "failed" ? "text-red-300" : "text-amber-300")} />;
+  if (status === "degraded" || status === "failed") {
+    return (
+      <span
+        className="agent-error-indicator group/error relative grid place-items-center"
+        title={error}
+        aria-label={error ? `Failure: ${error}` : "Agent failed"}
+      >
+        <CircleAlert
+          className={cn("size-3.5", status === "failed" ? "text-red-300" : "text-amber-300")}
+        />
+        {error && (
+          <span className="agent-error-tooltip" role="tooltip">
+            {error}
+          </span>
+        )}
+      </span>
+    );
+  }
   return <Bot className="size-3.5 text-white/30" />;
 }
 
@@ -61,13 +78,13 @@ function AgentNode({ data }: NodeProps<AgentFlowNode>) {
           {data.kind === "orchestrator" ? (
             <Sparkles className="size-3.5 text-[var(--lime)]" />
           ) : (
-            <StatusIcon status={data.status} />
+            <StatusIcon status={data.status} error={data.error} />
           )}
         </span>
         <div className="min-w-0">
           <p className="truncate text-[11px] font-semibold text-white/90">{data.label}</p>
           <p className="truncate font-mono text-[8px] uppercase tracking-[.13em] text-white/35">
-            {data.status === "running" ? "thinking…" : data.error ? `Failed · ${data.error}` : data.subtitle}
+            {data.retrying ? "retrying agent…" : data.status === "running" ? "thinking…" : data.error ? "Failed · hover for details" : data.subtitle}
           </p>
         </div>
         {data.error && data.onRetry && data.status !== "running" ? (
@@ -125,6 +142,7 @@ export function AgentGraph({
         subtitle: agent.role.split(",")[0] ?? "specialist",
         accent: agent.accent,
         status: retryingAgentId === agent.id ? "running" : (statuses[agent.id] ?? "idle"),
+        retrying: retryingAgentId === agent.id,
         ...(typeof latencies[agent.id] === "number" ? { latencyMs: latencies[agent.id] } : {}),
         ...(errors[agent.id] ? { error: errors[agent.id], onRetry: () => onRetry(agent.id) } : {}),
         kind: "agent" as const,
@@ -187,7 +205,7 @@ export function AgentGraph({
   );
 
   return (
-    <div className="h-full min-h-[440px]" aria-label="Live multi-agent execution graph">
+    <div className="agent-graph" aria-label="Live multi-agent execution graph">
       <ReactFlow
         nodes={nodes}
         edges={edges}

@@ -27,7 +27,7 @@ async function sha256(value: string): Promise<string> {
   return [...new Uint8Array(digest)].map((byte) => byte.toString(16).padStart(2, "0")).join("");
 }
 
-function parseResponse(raw: unknown): {
+export function parseResponse(raw: unknown): {
   payload: z.infer<typeof generatedPayloadSchema>;
   usage: { input: number; output: number };
 } {
@@ -40,8 +40,9 @@ function parseResponse(raw: unknown): {
     : { input: 0, output: 0 };
 
   const candidate = envelope.success ? envelope.data.response : raw;
-  const parsedCandidate =
-    typeof candidate === "string" ? (JSON.parse(candidate) as unknown) : candidate;
+  const parsedCandidate = typeof candidate === "string"
+    ? (JSON.parse(candidate.trim().replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/, "")) as unknown)
+    : candidate;
 
   return {
     payload: generatedPayloadSchema.parse(parsedCandidate),
@@ -103,7 +104,7 @@ export class WorkersAiProvider implements AgentProvider {
   }
 
   async generate(agentId: AgentId, prompt: string): Promise<GeneratedAgentPayload> {
-    const key = `agent:v2:${agentId}:${await sha256(`${this.model}:${prompt}`)}`;
+    const key = `agent:v3:${agentId}:${await sha256(`${this.model}:${prompt}`)}`;
     const cached = await this.cache.get(key, "json");
     const cachedPayload = generatedPayloadSchema.safeParse(cached);
 
@@ -116,24 +117,40 @@ export class WorkersAiProvider implements AgentProvider {
     }
 
     let finalError: Error | null = null;
-    const delays = [0, 250, 750];
-    for (const delay of delays) {
-      if (delay) {
-        await new Promise((resolve) => setTimeout(resolve, delay));
+    const attempts = [
+      {
+        delay: 0,
+        guidance: "Use 3–5 concise sections and keep the complete response comfortably under the token limit.",
+      },
+      {
+        delay: 250,
+        guidance:
+          "The previous response was invalid or incomplete. Return exactly 3 concise sections, at most 4 bullets per section, and one-sentence summaries.",
+      },
+      {
+        delay: 750,
+        guidance:
+          "Final retry: minimize the payload. Return exactly 2 concise sections, at most 3 short bullets per section, and no prose outside the JSON object.",
+      },
+    ];
+    for (const [index, attempt] of attempts.entries()) {
+      if (attempt.delay) {
+        await new Promise((resolve) => setTimeout(resolve, attempt.delay));
       }
 
       try {
-        const raw: unknown = await this.ai.run("@cf/meta/llama-3.1-8b-instruct-fast", {
+        const raw: unknown = await this.ai.run(this.model, {
           messages: [
             {
               role: "system",
               content:
-                "You are a disciplined product specialist. Return only valid JSON. Be concrete, concise, and honest about uncertainty.",
+                `You are a disciplined product specialist. Return only valid JSON. Be concrete, concise, and honest about uncertainty. ${attempt.guidance}`,
             },
             { role: "user", content: prompt },
           ],
-          max_tokens: 700,
-          temperature: 0.35,
+          max_tokens: 1_400,
+          temperature: Math.max(0.1, 0.3 - index * 0.1),
+          seed: 17 + index,
           response_format: {
             type: "json_schema",
             json_schema: jsonSchema(),
@@ -147,7 +164,11 @@ export class WorkersAiProvider implements AgentProvider {
           source: "ai",
         };
       } catch (error) {
-        finalError = error instanceof Error ? error : new Error("Workers AI request failed.");
+        const message = error instanceof Error ? error.message : "Workers AI request failed.";
+        finalError =
+          error instanceof SyntaxError
+            ? new Error(`AI returned incomplete or invalid JSON on attempt ${index + 1}/3: ${message}`)
+            : new Error(`AI structured output failed on attempt ${index + 1}/3: ${message}`);
       }
     }
 

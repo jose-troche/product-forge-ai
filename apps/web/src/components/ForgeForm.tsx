@@ -8,6 +8,7 @@ type Brief = Omit<ProductInput, "sessionId">;
 interface ForgeFormProps {
   disabled: boolean;
   onSubmit: (brief: Brief) => void;
+  onBriefReplace: () => void;
 }
 
 const defaultBrief: Brief = {
@@ -53,7 +54,7 @@ const examples: Array<{ label: string; brief: Brief }> = [
   },
 ];
 
-export function ForgeForm({ disabled, onSubmit }: ForgeFormProps) {
+export function ForgeForm({ disabled, onSubmit, onBriefReplace }: ForgeFormProps) {
   const [brief, setBrief] = useState<Brief>(defaultBrief);
 
   const update = <Key extends keyof Brief>(key: Key, value: Brief[Key]) => {
@@ -63,6 +64,11 @@ export function ForgeForm({ disabled, onSubmit }: ForgeFormProps) {
   const submit = (event: FormEvent) => {
     event.preventDefault();
     onSubmit(brief);
+  };
+
+  const replaceBrief = (nextBrief: Brief) => {
+    onBriefReplace();
+    setBrief(nextBrief);
   };
 
   return (
@@ -78,8 +84,7 @@ export function ForgeForm({ disabled, onSubmit }: ForgeFormProps) {
               <button
                 type="button"
                 className="flex items-center gap-1 rounded-md px-1.5 py-1 font-mono text-[9px] uppercase tracking-wider text-white/35 transition hover:bg-white/[.05] hover:text-white/65"
-                onClick={() => setBrief(blankBrief)}
-                disabled={disabled}
+                onClick={() => replaceBrief(blankBrief)}
               >
                 <RotateCcw className="size-2.5" />
                 Reset
@@ -101,8 +106,7 @@ export function ForgeForm({ disabled, onSubmit }: ForgeFormProps) {
                 key={example.label}
                 type="button"
                 className="rounded-full border border-white/[.07] bg-white/[.025] px-2.5 py-1 text-[10px] text-white/45 transition hover:border-white/15 hover:text-white/70"
-                onClick={() => setBrief(example.brief)}
-                disabled={disabled}
+                onClick={() => replaceBrief(example.brief)}
               >
                 {example.label}
               </button>

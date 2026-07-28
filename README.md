@@ -6,7 +6,7 @@ Product Forge AI turns a product idea into a structured, production-ready propos
 
 The result includes a market thesis, competitor map, PRD, user experience, system architecture, SQL schema, OpenAPI contract, roadmap, KPIs, and risk register. Projects are saved to a session-private workspace and can be exported as Markdown, JSON, SQL, OpenAPI, Mermaid, or print-ready PDF.
 
-When an agent exhausts its automatic retries, the graph preserves the failure reason, uses a visible specialist fallback, and offers a per-node retry that re-runs only that agent before re-synthesizing the saved proposal. Example briefs populate the entire form, while Reset returns the form to a blank idea and constraints with sensible defaults.
+When an agent exhausts its automatic retries, the graph preserves the failure reason, exposes it on hover, uses a visible specialist fallback, and offers a per-node retry with live progress that re-runs only that agent before re-synthesizing the saved proposal. Structured-output retries use additional response headroom and progressively tighter brevity guidance to avoid repeating truncated JSON. Example briefs populate the entire form and clear the old workspace, while Reset returns the form to a blank idea and constraints with sensible defaults.
 
 ## Architecture
 

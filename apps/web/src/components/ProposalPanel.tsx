@@ -62,12 +62,12 @@ function ExportMenu({ project }: { project: Project }) {
 
   const options = [
     {
-      label: "Markdown",
+      label: "Complete Markdown",
       icon: FileText,
       action: () => download(`${slug}-product-plan.md`, fullMarkdown(proposal), "text/markdown"),
     },
     {
-      label: "JSON",
+      label: "Complete JSON",
       icon: FileJson,
       action: () => download(`${slug}-product-plan.json`, JSON.stringify(project, null, 2), "application/json"),
     },
@@ -87,7 +87,7 @@ function ExportMenu({ project }: { project: Project }) {
       action: () => download(`${slug}-architecture.mmd`, proposal.artifacts.mermaid, "text/plain"),
     },
     {
-      label: "PDF / print",
+      label: "Complete PDF / print",
       icon: Printer,
       action: () => window.print(),
     },
@@ -159,6 +159,44 @@ function ProposalContent({ proposal, section }: { proposal: Proposal; section: P
   );
 }
 
+function CompletePrintView({ proposal }: { proposal: Proposal }) {
+  return (
+    <div className="print-complete">
+      <header className="mb-8 border-b border-black/15 pb-5">
+        <p className="text-xs uppercase tracking-[.16em] text-black/50">Product Forge AI · Complete product plan</p>
+        <h1 className="mt-2 font-serif text-4xl text-black">{proposal.title}</h1>
+        <p className="mt-2 text-sm text-black/60">{proposal.oneLiner}</p>
+      </header>
+      {proposal.sections.map((proposalSection) => (
+        <section key={proposalSection.id} className="mb-8 break-inside-avoid-page">
+          <h2 className="mb-3 font-serif text-3xl text-black">{proposalSection.title}</h2>
+          <article className="proposal-copy print-copy">
+            <ReactMarkdown remarkPlugins={[remarkGfm]}>{proposalSection.markdown}</ReactMarkdown>
+          </article>
+        </section>
+      ))}
+      <section className="mb-8 break-before-page">
+        <h2 className="mb-3 font-serif text-3xl text-black">Database schema</h2>
+        <pre className="whitespace-pre-wrap rounded-lg border border-black/15 bg-black/[.03] p-4 text-[9px] leading-relaxed text-black">
+          <code>{proposal.artifacts.sql}</code>
+        </pre>
+      </section>
+      <section className="mb-8 break-before-page">
+        <h2 className="mb-3 font-serif text-3xl text-black">API specification</h2>
+        <pre className="whitespace-pre-wrap rounded-lg border border-black/15 bg-black/[.03] p-4 text-[9px] leading-relaxed text-black">
+          <code>{proposal.artifacts.openapi}</code>
+        </pre>
+      </section>
+      <section className="mb-8">
+        <h2 className="mb-3 font-serif text-3xl text-black">Architecture diagram source</h2>
+        <pre className="whitespace-pre-wrap rounded-lg border border-black/15 bg-black/[.03] p-4 text-[9px] leading-relaxed text-black">
+          <code>{proposal.artifacts.mermaid}</code>
+        </pre>
+      </section>
+    </div>
+  );
+}
+
 export function ProposalPanel({
   project,
   loading,
@@ -211,7 +249,7 @@ export function ProposalPanel({
 
   return (
     <div className="flex h-full min-h-0 flex-col">
-      <div className="border-b border-white/[.07] px-5 pb-4 pt-5">
+      <div className="screen-proposal-content border-b border-white/[.07] px-5 pb-4 pt-5">
         <div className="flex items-start gap-4">
           <div className="min-w-0 flex-1">
             <div className="mb-2 flex items-center gap-2">
@@ -241,7 +279,7 @@ export function ProposalPanel({
         </div>
       </div>
 
-      <div className="scrollbar-none flex shrink-0 gap-1 overflow-x-auto border-b border-white/[.07] px-4 py-2" role="tablist">
+      <div className="screen-proposal-content scrollbar-none flex shrink-0 gap-1 overflow-x-auto border-b border-white/[.07] px-4 py-2" role="tablist">
         {tabs.map((tab) => (
           <button
             key={tab.id}
@@ -263,9 +301,10 @@ export function ProposalPanel({
         ))}
       </div>
 
-      <div className="min-h-0 flex-1 overflow-y-auto px-5 py-6">
+      <div className="screen-proposal-content min-h-0 flex-1 overflow-y-auto px-5 py-6">
         {raw ? <CodePreview code={JSON.stringify(project, null, 2)} language="Structured agent output · JSON" /> : <ProposalContent proposal={proposal} section={section} />}
       </div>
+      <CompletePrintView proposal={proposal} />
     </div>
   );
 }

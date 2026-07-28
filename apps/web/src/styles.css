@@ -356,6 +356,10 @@ select.field option {
   height: auto;
 }
 
+.print-complete {
+  display: none;
+}
+
 .statusbar {
   display: flex;
   align-items: center;
@@ -450,7 +454,8 @@ select.field option {
   .graph-panel,
   .statusbar,
   .proposal-panel > .panel-heading,
-  .proposal-panel button {
+  .proposal-panel button,
+  .screen-proposal-content {
     display: none !important;
   }
 
@@ -476,6 +481,29 @@ select.field option {
   .proposal-copy,
   .proposal-copy h2,
   .proposal-copy h3 {
+    color: #17201c;
+  }
+
+  .print-complete {
+    display: block !important;
+    padding: 28px;
+    color: #17201c;
+  }
+
+  .print-copy blockquote {
+    border-left-color: #60744c;
+    background: #f3f5f0;
+    color: #253029;
+  }
+
+  .print-copy table,
+  .print-copy th,
+  .print-copy td {
+    border-color: rgba(0, 0, 0, 0.16);
+  }
+
+  .print-copy th {
+    background: rgba(0, 0, 0, 0.04);
     color: #17201c;
   }
 }

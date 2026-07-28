@@ -1,14 +1,14 @@
-import type { OrchestrationEvent, ProductInput, Project } from "@product-forge/contracts";
+import type { AgentId, OrchestrationEvent, ProductInput, Project } from "@product-forge/contracts";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Boxes, CircleDot, Clock3, CodeXml, FolderClock, RotateCcw, Sparkles, Zap } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { AgentGraph, deriveStatuses } from "./components/AgentGraph";
 import { ExecutionTimeline } from "./components/ExecutionTimeline";
 import { ForgeForm } from "./components/ForgeForm";
 import { ProposalPanel } from "./components/ProposalPanel";
 import { RecentProjects } from "./components/RecentProjects";
 import { Button } from "./components/ui/button";
-import { fetchProject, fetchProjects, forgeProject } from "./lib/api";
+import { fetchProject, fetchProjects, forgeProject, retryProjectAgent } from "./lib/api";
 import { formatDuration } from "./lib/utils";
 
 function getSessionId(): string {
@@ -32,7 +32,11 @@ export default function App() {
   const [error, setError] = useState<string | null>(null);
   const [recentOpen, setRecentOpen] = useState(false);
   const [loadingProjectId, setLoadingProjectId] = useState<string | null>(null);
-  const { statuses, latencies } = useMemo(() => deriveStatuses(events), [events]);
+  const [retryingAgentId, setRetryingAgentId] = useState<AgentId | null>(null);
+  const { statuses, latencies, errors } = useMemo(
+    () => deriveStatuses(events, project?.agents),
+    [events, project?.agents],
+  );
 
   const history = useQuery({
     queryKey: ["projects", sessionId],
@@ -79,6 +83,57 @@ export default function App() {
       setLoadingProjectId(null);
     }
   };
+
+  const retryAgent = useCallback(
+    async (agentId: AgentId) => {
+      if (!project || running || retryingAgentId) return;
+      const at = new Date().toISOString();
+      setRetryingAgentId(agentId);
+      setError(null);
+      setEvents((current) => [
+        ...current,
+        { type: "agent.started", projectId: project.id, agentId, at },
+      ]);
+
+      try {
+        const updated = await retryProjectAgent(project.id, agentId, sessionId);
+        const retried = updated.agents.find((agent) => agent.agentId === agentId);
+        if (!retried) throw new Error("The retried agent output was not returned.");
+        setProject(updated);
+        setEvents((current) => [
+          ...current,
+          {
+            type: "agent.completed",
+            projectId: updated.id,
+            agent: retried,
+            at: new Date().toISOString(),
+          },
+          {
+            type: "synthesis.completed",
+            projectId: updated.id,
+            at: new Date().toISOString(),
+          },
+        ]);
+        await queryClient.invalidateQueries({ queryKey: ["projects", sessionId] });
+      } catch (cause) {
+        const message = cause instanceof Error ? cause.message : "The agent retry failed.";
+        setError(message);
+        setEvents((current) => [
+          ...current,
+          {
+            type: "agent.failed",
+            projectId: project.id,
+            agentId,
+            message,
+            at: new Date().toISOString(),
+          },
+        ]);
+      } finally {
+        setRetryingAgentId(null);
+      }
+    },
+    [project, queryClient, retryingAgentId, running, sessionId],
+  );
 
   const completedAgents = Object.values(statuses).filter(
     (status) => status === "completed" || status === "degraded",
@@ -162,7 +217,13 @@ export default function App() {
             </div>
           </div>
           <div className="min-h-0 flex-1">
-            <AgentGraph statuses={statuses} latencies={latencies} />
+            <AgentGraph
+              statuses={statuses}
+              latencies={latencies}
+              errors={errors}
+              retryingAgentId={retryingAgentId}
+              onRetry={(agentId) => void retryAgent(agentId)}
+            />
           </div>
           <ExecutionTimeline events={events} startedAt={startedAt} running={running} />
           {error && (

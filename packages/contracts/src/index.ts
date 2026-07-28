@@ -57,6 +57,7 @@ export const agentResultSchema = z.object({
     })
     .default({ input: 0, output: 0 }),
   source: z.enum(["ai", "cache", "fallback"]),
+  failureReason: z.string().min(1).optional(),
 });
 
 export type AgentResult = z.infer<typeof agentResultSchema>;

@@ -61,42 +61,58 @@ function eventBase(state: WorkflowStateType) {
   };
 }
 
+async function generateAgentResult(
+  agentId: AgentId,
+  input: ProductInput,
+  refinedIdea: string,
+  provider: AgentProvider,
+): Promise<AgentResult> {
+  const definition = agentDefinitionById.get(agentId);
+  if (!definition) {
+    throw new Error(`Missing agent definition for ${agentId}`);
+  }
+
+  const startedAt = Date.now();
+  const generated = await provider.generate(agentId, buildAgentPrompt(definition, input, refinedIdea));
+  return agentResultSchema.parse({
+    agentId,
+    title: definition.name,
+    ...generated,
+    latencyMs: Date.now() - startedAt,
+    source: generated.source ?? "ai",
+  });
+}
+
 function createAgentNode(agentId: AgentId) {
   return async (state: WorkflowStateType): Promise<Partial<WorkflowStateType>> => {
-    const definition = agentDefinitionById.get(agentId);
-    if (!definition) {
-      throw new Error(`Missing agent definition for ${agentId}`);
-    }
-
     state.emit({ ...eventBase(state), type: "agent.started", agentId });
     const startedAt = Date.now();
     let result: AgentResult;
 
     try {
-      const generated = await state.provider.generate(
-        agentId,
-        buildAgentPrompt(definition, state.input, state.refinedIdea),
-      );
-      result = agentResultSchema.parse({
-        agentId,
-        title: definition.name,
-        ...generated,
-        latencyMs: Date.now() - startedAt,
-        source: generated.source ?? "ai",
-      });
+      result = await generateAgentResult(agentId, state.input, state.refinedIdea, state.provider);
     } catch (error) {
+      const message = error instanceof Error ? error.message : "Agent generation failed";
       state.emit({
         ...eventBase(state),
         type: "agent.failed",
         agentId,
-        message: error instanceof Error ? error.message : "Agent generation failed",
+        message,
       });
-      result = buildFallbackResult(agentId, state.input, Date.now() - startedAt);
+      result = buildFallbackResult(agentId, state.input, Date.now() - startedAt, message);
     }
 
     state.emit({ ...eventBase(state), type: "agent.completed", agent: result });
     return { agents: [result] };
   };
+}
+
+export async function retryProductAgent(
+  input: ProductInput,
+  agentId: AgentId,
+  provider: AgentProvider,
+): Promise<AgentResult> {
+  return generateAgentResult(agentId, input, refineIdea(input), provider);
 }
 
 const refineNode = async (state: WorkflowStateType): Promise<Partial<WorkflowStateType>> => {

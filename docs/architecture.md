@@ -11,6 +11,8 @@
 7. Agent results and the final proposal are written to D1 as one batch.
 8. The stream closes with the completed, typed project.
 
+A failed node can later be retried through `POST /api/projects/:id/agents/:agentId/retry`. The endpoint verifies session ownership, re-runs only that specialist, replaces its stored output, re-synthesizes all proposal sections, and updates the existing project rather than creating a duplicate.
+
 ## Boundaries
 
 - `packages/contracts` is the only wire-format authority.

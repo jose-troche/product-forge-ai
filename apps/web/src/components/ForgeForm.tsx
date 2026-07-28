@@ -1,5 +1,5 @@
 import type { ProductInput } from "@product-forge/contracts";
-import { ArrowUpRight, Sparkles } from "lucide-react";
+import { ArrowUpRight, RotateCcw, Sparkles } from "lucide-react";
 import { useState, type FormEvent } from "react";
 import { Button } from "./ui/button";
 
@@ -10,20 +10,51 @@ interface ForgeFormProps {
   onSubmit: (brief: Brief) => void;
 }
 
-const examples = [
-  "Airbnb for boats",
-  "Incident command for clinics",
-  "A calm CRM for freelancers",
+const defaultBrief: Brief = {
+  idea: "Build Airbnb for boats.",
+  constraints: "Launch in one coastal market. Prioritize trust and owner verification.",
+  industry: "Travel & marketplaces",
+  budget: "Under $50K",
+  teamSize: "2–5 people",
+};
+
+const blankBrief: Brief = {
+  idea: "",
+  constraints: "",
+  industry: "Technology",
+  budget: "Bootstrapped",
+  teamSize: "2–5 people",
+};
+
+const examples: Array<{ label: string; brief: Brief }> = [
+  {
+    label: "Airbnb for boats",
+    brief: defaultBrief,
+  },
+  {
+    label: "Incident command for clinics",
+    brief: {
+      idea: "Build an incident command center for independent clinics.",
+      constraints: "HIPAA-aware, mobile first, and deployable without dedicated IT staff.",
+      industry: "Healthcare operations",
+      budget: "$50K–$250K",
+      teamSize: "6–12 people",
+    },
+  },
+  {
+    label: "A calm CRM for freelancers",
+    brief: {
+      idea: "Build a calm CRM for independent freelancers.",
+      constraints: "Privacy-first, email-friendly, and useful without complex setup or sales jargon.",
+      industry: "Freelance business tools",
+      budget: "Bootstrapped",
+      teamSize: "Solo founder",
+    },
+  },
 ];
 
 export function ForgeForm({ disabled, onSubmit }: ForgeFormProps) {
-  const [brief, setBrief] = useState<Brief>({
-    idea: "Build Airbnb for boats.",
-    constraints: "Launch in one coastal market. Prioritize trust and owner verification.",
-    industry: "Travel & marketplaces",
-    budget: "Under $50K",
-    teamSize: "2–5 people",
-  });
+  const [brief, setBrief] = useState<Brief>(defaultBrief);
 
   const update = <Key extends keyof Brief>(key: Key, value: Brief[Key]) => {
     setBrief((current) => ({ ...current, [key]: value }));
@@ -42,7 +73,18 @@ export function ForgeForm({ disabled, onSubmit }: ForgeFormProps) {
             <label className="field-label" htmlFor="idea">
               Product idea
             </label>
-            <span className="font-mono text-[10px] text-white/30">{brief.idea.length}/2500</span>
+            <div className="flex items-center gap-2">
+              <span className="font-mono text-[10px] text-white/30">{brief.idea.length}/2500</span>
+              <button
+                type="button"
+                className="flex items-center gap-1 rounded-md px-1.5 py-1 font-mono text-[9px] uppercase tracking-wider text-white/35 transition hover:bg-white/[.05] hover:text-white/65"
+                onClick={() => setBrief(blankBrief)}
+                disabled={disabled}
+              >
+                <RotateCcw className="size-2.5" />
+                Reset
+              </button>
+            </div>
           </div>
           <textarea
             id="idea"
@@ -56,12 +98,13 @@ export function ForgeForm({ disabled, onSubmit }: ForgeFormProps) {
           <div className="mt-2 flex flex-wrap gap-1.5" aria-label="Example ideas">
             {examples.map((example) => (
               <button
-                key={example}
+                key={example.label}
                 type="button"
                 className="rounded-full border border-white/[.07] bg-white/[.025] px-2.5 py-1 text-[10px] text-white/45 transition hover:border-white/15 hover:text-white/70"
-                onClick={() => update("idea", `Build ${example.toLowerCase()}.`)}
+                onClick={() => setBrief(example.brief)}
+                disabled={disabled}
               >
-                {example}
+                {example.label}
               </button>
             ))}
           </div>

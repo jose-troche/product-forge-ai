@@ -1,5 +1,10 @@
-import { productInputSchema, type OrchestrationEvent, type Project } from "@product-forge/contracts";
-import { runProductForge } from "@product-forge/orchestrator";
+import {
+  agentIdSchema,
+  productInputSchema,
+  type OrchestrationEvent,
+  type Project,
+} from "@product-forge/contracts";
+import { retryProductAgent, runProductForge, synthesizeProposal } from "@product-forge/orchestrator";
 import { Hono } from "hono";
 import { secureHeaders } from "hono/secure-headers";
 import { z } from "zod";
@@ -155,6 +160,64 @@ app.post("/api/projects", async (c) => {
       "X-Content-Type-Options": "nosniff",
     },
   });
+});
+
+app.post("/api/projects/:id/agents/:agentId/retry", async (c) => {
+  const contentLength = Number(c.req.header("content-length") ?? "0");
+  if (contentLength > 1_024) {
+    return c.json({ error: "Request body is too large." }, 413);
+  }
+
+  const projectId = z.string().uuid().safeParse(c.req.param("id"));
+  const agentId = agentIdSchema.safeParse(c.req.param("agentId"));
+  let body: unknown;
+  try {
+    body = await c.req.json();
+  } catch {
+    return c.json({ error: "Request body must be valid JSON." }, 400);
+  }
+  const session = z.object({ sessionId: z.string().uuid() }).safeParse(body);
+
+  if (!projectId.success || !agentId.success || !session.success) {
+    return c.json({ error: "A valid project, agent, and session are required." }, 400);
+  }
+  if (!(await applyRateLimit(c.env.CACHE, session.data.sessionId))) {
+    return c.json({ error: "Generation limit reached. Try again in a minute." }, 429);
+  }
+
+  const existing = await getProject(c.env.DB, projectId.data, session.data.sessionId);
+  if (!existing || !existing.proposal) {
+    return c.json({ error: "Completed project not found." }, 404);
+  }
+
+  const provider = new WorkersAiProvider(c.env.AI, c.env.CACHE, c.env.AI_MODEL);
+  try {
+    const retriedAgent = await retryProductAgent(existing.input, agentId.data, provider);
+    const agents = existing.agents.map((agent) =>
+      agent.agentId === agentId.data ? retriedAgent : agent,
+    );
+    const proposal = synthesizeProposal(
+      existing.input,
+      agents,
+      existing.proposal.totalLatencyMs + retriedAgent.latencyMs,
+      provider.model,
+    );
+    await completeProject(c.env.DB, existing.id, proposal, agents);
+    const updated = await getProject(c.env.DB, existing.id, session.data.sessionId);
+    if (!updated) throw new Error("Retried project could not be reloaded.");
+    return c.json(updated);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Agent retry failed.";
+    console.error(
+      JSON.stringify({
+        message: "agent.retry.failed",
+        projectId: projectId.data,
+        agentId: agentId.data,
+        error: message,
+      }),
+    );
+    return c.json({ error: `Retry failed after three attempts: ${message}` }, 502);
+  }
 });
 
 app.notFound((c) => c.json({ error: "API route not found." }, 404));

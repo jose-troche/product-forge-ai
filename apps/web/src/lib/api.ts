@@ -2,6 +2,7 @@ import {
   orchestrationEventSchema,
   projectListResponseSchema,
   projectSchema,
+  type AgentId,
   type OrchestrationEvent,
   type ProductInput,
   type Project,
@@ -70,6 +71,23 @@ export async function fetchProjects(sessionId: string): Promise<ProjectSummary[]
 export async function fetchProject(projectId: string, sessionId: string): Promise<Project> {
   const response = await fetch(
     `/api/projects/${encodeURIComponent(projectId)}?sessionId=${encodeURIComponent(sessionId)}`,
+  );
+  if (!response.ok) throw new Error(await errorMessage(response));
+  return projectSchema.parse(await response.json());
+}
+
+export async function retryProjectAgent(
+  projectId: string,
+  agentId: AgentId,
+  sessionId: string,
+): Promise<Project> {
+  const response = await fetch(
+    `/api/projects/${encodeURIComponent(projectId)}/agents/${encodeURIComponent(agentId)}/retry`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ sessionId }),
+    },
   );
   if (!response.ok) throw new Error(await errorMessage(response));
   return projectSchema.parse(await response.json());

@@ -361,7 +361,12 @@ const builders: Record<AgentId, (input: ProductInput) => AgentSection[]> = {
   ],
 };
 
-export function buildFallbackResult(agentId: AgentId, input: ProductInput, latencyMs = 0): AgentResult {
+export function buildFallbackResult(
+  agentId: AgentId,
+  input: ProductInput,
+  latencyMs = 0,
+  failureReason?: string,
+): AgentResult {
   const definition = agentDefinitionById.get(agentId);
   if (!definition) {
     throw new Error(`Unknown agent: ${agentId}`);
@@ -385,5 +390,6 @@ export function buildFallbackResult(agentId: AgentId, input: ProductInput, laten
     latencyMs,
     tokenUsage: { input: 0, output: 0 },
     source: "fallback",
+    ...(failureReason ? { failureReason } : {}),
   };
 }

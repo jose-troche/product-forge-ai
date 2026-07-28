@@ -10,7 +10,7 @@ function labelForEvent(event: OrchestrationEvent): string | null {
   if (event.type === "project.started") return "Brief refined and execution plan created";
   if (event.type === "agent.started") return `${agentNames.get(event.agentId)} started`;
   if (event.type === "agent.completed") return `${event.agent.title} completed`;
-  if (event.type === "agent.failed") return `${agentNames.get(event.agentId)} switched to resilient fallback`;
+  if (event.type === "agent.failed") return `${agentNames.get(event.agentId)} failed: ${event.message}`;
   if (event.type === "synthesis.started") return "Synthesis and quality validation started";
   if (event.type === "synthesis.completed") return "Proposal passed completeness validation";
   if (event.type === "project.completed") return "Product plan ready";

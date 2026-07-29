@@ -62,15 +62,24 @@ async function svgToPng(svg: string): Promise<string> {
     .map(Number);
   const viewBoxWidth = viewBox?.[2];
   const viewBoxHeight = viewBox?.[3];
+  const viewBoxX = viewBox?.[0];
+  const viewBoxY = viewBox?.[1];
   const width = viewBoxWidth !== undefined && Number.isFinite(viewBoxWidth) && viewBoxWidth > 0 ? viewBoxWidth : 1_200;
   const height =
     viewBoxHeight !== undefined && Number.isFinite(viewBoxHeight) && viewBoxHeight > 0 ? viewBoxHeight : 800;
-  const rasterWidth = Math.min(3_200, Math.max(1_800, Math.ceil(width * 2)));
-  const rasterHeight = Math.ceil((height / width) * rasterWidth);
+  const x = viewBoxX !== undefined && Number.isFinite(viewBoxX) ? viewBoxX : 0;
+  const y = viewBoxY !== undefined && Number.isFinite(viewBoxY) ? viewBoxY : 0;
+  const padding = Math.max(12, Math.min(width, height) * 0.025);
+  const paddedWidth = width + padding * 2;
+  const paddedHeight = height + padding * 2;
+  const rasterWidth = Math.min(3_200, Math.max(1_800, Math.ceil(paddedWidth * 2)));
+  const rasterHeight = Math.ceil((paddedHeight / paddedWidth) * rasterWidth);
 
   root.setAttribute("xmlns", "http://www.w3.org/2000/svg");
-  root.setAttribute("width", String(width));
-  root.setAttribute("height", String(height));
+  root.setAttribute("viewBox", `${x - padding} ${y - padding} ${paddedWidth} ${paddedHeight}`);
+  root.setAttribute("width", String(rasterWidth));
+  root.setAttribute("height", String(rasterHeight));
+  root.setAttribute("preserveAspectRatio", "xMidYMid meet");
 
   const canvas = window.document.createElement("canvas");
   canvas.width = rasterWidth;
@@ -92,11 +101,13 @@ async function svgToPng(svg: string): Promise<string> {
   await renderer.render({
     ignoreAnimation: true,
     ignoreMouse: true,
-    ignoreClear: true,
-    ignoreDimensions: true,
-    scaleWidth: rasterWidth,
-    scaleHeight: rasterHeight,
   });
+
+  context.save();
+  context.globalCompositeOperation = "destination-over";
+  context.fillStyle = "#ffffff";
+  context.fillRect(0, 0, rasterWidth, rasterHeight);
+  context.restore();
 
   return canvas.toDataURL("image/png");
 }

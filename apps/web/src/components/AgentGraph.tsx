@@ -13,7 +13,7 @@ import {
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
 import { Bot, Check, CircleAlert, LoaderCircle, RotateCcw, Sparkles } from "lucide-react";
-import { useMemo, type CSSProperties } from "react";
+import { useEffect, useMemo, useState, type CSSProperties } from "react";
 import { cn, formatDuration } from "../lib/utils";
 
 export type AgentStatus = "idle" | "running" | "completed" | "degraded" | "failed";
@@ -119,6 +119,19 @@ interface AgentGraphProps {
   onRetry: (agentId: AgentId) => void;
 }
 
+function useMobileGraphLayout() {
+  const [mobile, setMobile] = useState(() => window.matchMedia("(max-width: 760px)").matches);
+
+  useEffect(() => {
+    const media = window.matchMedia("(max-width: 760px)");
+    const update = () => setMobile(media.matches);
+    media.addEventListener("change", update);
+    return () => media.removeEventListener("change", update);
+  }, []);
+
+  return mobile;
+}
+
 export function AgentGraph({
   statuses,
   latencies,
@@ -126,10 +139,14 @@ export function AgentGraph({
   retryingAgentId,
   onRetry,
 }: AgentGraphProps) {
+  const mobileLayout = useMobileGraphLayout();
   const nodes = useMemo<AgentFlowNode[]>(() => {
     const width = 172;
-    const gap = 18;
-    const columns = 4;
+    const gap = mobileLayout ? 12 : 18;
+    const columns = mobileLayout ? 2 : 4;
+    const graphWidth = columns * width + (columns - 1) * gap;
+    const centerX = mobileLayout ? (graphWidth - width) / 2 : 294;
+    const agentRows = Math.ceil(agentDefinitions.length / columns);
     const agents = agentDefinitions.map((agent, index) => ({
       id: agent.id,
       type: "agent" as const,
@@ -153,7 +170,7 @@ export function AgentGraph({
       {
         id: "orchestrator",
         type: "agent",
-        position: { x: 294, y: 4 },
+        position: { x: centerX, y: 4 },
         data: {
           label: "Product Orchestrator",
           subtitle: "refine · delegate · validate",
@@ -166,7 +183,7 @@ export function AgentGraph({
       {
         id: "synthesis",
         type: "agent",
-        position: { x: 294, y: 418 },
+        position: { x: centerX, y: mobileLayout ? 112 + agentRows * 92 + 30 : 418 },
         data: {
           label: "Synthesis Agent",
           subtitle: "cohesive proposal",
@@ -176,7 +193,7 @@ export function AgentGraph({
         },
       },
     ];
-  }, [errors, latencies, onRetry, retryingAgentId, statuses]);
+  }, [errors, latencies, mobileLayout, onRetry, retryingAgentId, statuses]);
 
   const edges = useMemo<Edge[]>(
     () => [
@@ -207,12 +224,13 @@ export function AgentGraph({
   return (
     <div className="agent-graph" aria-label="Live multi-agent execution graph">
       <ReactFlow
+        key={mobileLayout ? "mobile" : "desktop"}
         nodes={nodes}
         edges={edges}
         nodeTypes={nodeTypes}
         fitView
-        fitViewOptions={{ padding: 0.08 }}
-        minZoom={0.55}
+        fitViewOptions={{ padding: mobileLayout ? 0.04 : 0.08 }}
+        minZoom={mobileLayout ? 0.4 : 0.55}
         maxZoom={1.25}
         nodesDraggable={false}
         nodesConnectable={false}

@@ -294,7 +294,7 @@ export default function App() {
               </span>
             </div>
           </div>
-          <div className="min-h-0 flex-1">
+          <div className="graph-stage">
             <AgentGraph
               statuses={statuses}
               latencies={latencies}

@@ -238,6 +238,11 @@ select.field option {
   min-height: 0;
 }
 
+.graph-stage {
+  min-height: 0;
+  flex: 1 1 0;
+}
+
 .retry-notice {
   display: flex;
   flex: 0 0 auto;
@@ -522,11 +527,13 @@ select.field option {
   }
 
   .graph-panel {
-    min-height: 700px;
+    min-height: 0;
   }
 
-  .agent-graph {
-    min-height: 440px;
+  .graph-stage {
+    height: min(780px, 210vw);
+    min-height: min(780px, 210vw);
+    flex: 0 0 min(780px, 210vw);
   }
 
   .proposal-panel {

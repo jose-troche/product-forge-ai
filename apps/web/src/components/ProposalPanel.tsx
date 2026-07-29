@@ -18,7 +18,7 @@ import { useEffect, useMemo, useState } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { cn, formatDuration } from "../lib/utils";
-import { MermaidDiagram } from "./MermaidDiagram";
+import { MermaidDiagram, MermaidRasterDiagram } from "./MermaidDiagram";
 import { Button } from "./ui/button";
 
 const tabs: Array<{ id: ProposalSection["id"]; short: string }> = [
@@ -54,7 +54,7 @@ function download(name: string, content: string, type: string) {
   URL.revokeObjectURL(url);
 }
 
-function ExportMenu({ project }: { project: Project }) {
+function ExportMenu({ project, printReady }: { project: Project; printReady: boolean }) {
   const [open, setOpen] = useState(false);
   const proposal = project.proposal;
   if (!proposal) return null;
@@ -87,9 +87,10 @@ function ExportMenu({ project }: { project: Project }) {
       action: () => download(`${slug}-architecture.mmd`, proposal.artifacts.mermaid, "text/plain"),
     },
     {
-      label: "Complete PDF / print",
+      label: printReady ? "Complete PDF / print" : "Preparing PDF…",
       icon: Printer,
       action: () => window.print(),
+      disabled: !printReady,
     },
   ];
 
@@ -102,10 +103,11 @@ function ExportMenu({ project }: { project: Project }) {
       </Button>
       {open && (
         <div className="absolute right-0 top-11 z-30 w-48 rounded-xl border border-white/10 bg-[#101a17] p-1.5 shadow-2xl">
-          {options.map(({ label, icon: Icon, action }) => (
+          {options.map(({ label, icon: Icon, action, disabled }) => (
             <button
               key={label}
-              className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-left text-xs text-white/65 hover:bg-white/[.06] hover:text-white"
+              className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-left text-xs text-white/65 hover:bg-white/[.06] hover:text-white disabled:cursor-wait disabled:text-white/25 disabled:hover:bg-transparent"
+              disabled={disabled}
               onClick={() => {
                 action();
                 setOpen(false);
@@ -159,7 +161,13 @@ function ProposalContent({ proposal, section }: { proposal: Proposal; section: P
   );
 }
 
-function CompletePrintView({ proposal }: { proposal: Proposal }) {
+function CompletePrintView({
+  proposal,
+  onDiagramReady,
+}: {
+  proposal: Proposal;
+  onDiagramReady: (ready: boolean) => void;
+}) {
   return (
     <div className="print-complete">
       <header className="mb-8 border-b border-black/15 pb-5">
@@ -187,11 +195,9 @@ function CompletePrintView({ proposal }: { proposal: Proposal }) {
           <code>{proposal.artifacts.openapi}</code>
         </pre>
       </section>
-      <section className="mb-8">
-        <h2 className="mb-3 font-serif text-3xl text-black">Architecture diagram source</h2>
-        <pre className="whitespace-pre-wrap rounded-lg border border-black/15 bg-black/[.03] p-4 text-[9px] leading-relaxed text-black">
-          <code>{proposal.artifacts.mermaid}</code>
-        </pre>
+      <section className="mb-8 break-before-page break-inside-avoid-page">
+        <h2 className="mb-3 font-serif text-3xl text-black">Architecture diagram</h2>
+        <MermaidRasterDiagram code={proposal.artifacts.mermaid} onReady={onDiagramReady} />
       </section>
     </div>
   );
@@ -208,6 +214,7 @@ export function ProposalPanel({
 }) {
   const [activeTab, setActiveTab] = useState<ProposalSection["id"]>("executive");
   const [raw, setRaw] = useState(false);
+  const [printDiagramReady, setPrintDiagramReady] = useState(false);
   const proposal = project?.proposal ?? null;
   const section = useMemo(
     () => proposal?.sections.find((candidate) => candidate.id === activeTab) ?? proposal?.sections[0],
@@ -279,7 +286,7 @@ export function ProposalPanel({
             <Button variant="secondary" size="icon" onClick={() => setRaw((value) => !value)} title="Toggle raw JSON">
               {raw ? <FileText className="size-4" /> : <Code2 className="size-4" />}
             </Button>
-            <ExportMenu project={project} />
+            <ExportMenu project={project} printReady={printDiagramReady} />
           </div>
         </div>
       </div>
@@ -309,7 +316,7 @@ export function ProposalPanel({
       <div className="screen-proposal-content min-h-0 flex-1 overflow-y-auto px-5 py-6">
         {raw ? <CodePreview code={JSON.stringify(project, null, 2)} language="Structured agent output · JSON" /> : <ProposalContent proposal={proposal} section={section} />}
       </div>
-      <CompletePrintView proposal={proposal} />
+      <CompletePrintView proposal={proposal} onDiagramReady={setPrintDiagramReady} />
     </div>
   );
 }

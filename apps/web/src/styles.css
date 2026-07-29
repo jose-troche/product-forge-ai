@@ -422,6 +422,37 @@ select.field option {
   display: none;
 }
 
+.print-mermaid-figure {
+  margin: 0;
+}
+
+.print-mermaid-figure img {
+  display: block;
+  width: 100%;
+  height: auto;
+  border: 1px solid rgba(0, 0, 0, 0.14);
+  border-radius: 10px;
+  background: white;
+}
+
+.print-mermaid-figure figcaption {
+  margin-top: 8px;
+  font-size: 9px;
+  color: rgba(0, 0, 0, 0.48);
+  text-align: center;
+}
+
+.print-mermaid-loading,
+.print-mermaid-error {
+  border: 1px solid rgba(0, 0, 0, 0.14);
+  border-radius: 10px;
+  padding: 24px;
+  background: #f7f9f7;
+  color: #536058;
+  font-size: 11px;
+  text-align: center;
+}
+
 .statusbar {
   display: flex;
   align-items: center;
@@ -573,5 +604,9 @@ select.field option {
   .print-copy th {
     background: rgba(0, 0, 0, 0.04);
     color: #17201c;
+  }
+
+  .print-mermaid-figure {
+    break-inside: avoid;
   }
 }

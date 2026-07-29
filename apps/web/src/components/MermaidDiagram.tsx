@@ -18,6 +18,9 @@ function renderMermaid(code: string, id: string, print: boolean): Promise<string
       startOnLoad: false,
       securityLevel: "strict",
       theme: "base",
+      // Mermaid 11 reads the global setting first. Print diagrams must use
+      // native SVG text because canvg does not render foreignObject labels.
+      htmlLabels: !print,
       flowchart: {
         htmlLabels: !print,
       },

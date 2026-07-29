@@ -48,58 +48,72 @@ function renderMermaid(code: string, id: string, print: boolean): Promise<string
   });
 }
 
-function svgToPng(svg: string): Promise<string> {
+async function svgToPng(svg: string): Promise<string> {
+  const parsedDocument = new DOMParser().parseFromString(svg, "image/svg+xml");
+  const root = parsedDocument.documentElement;
+  if (root.localName === "parsererror") {
+    throw new Error("The Mermaid SVG is invalid.");
+  }
+
+  const viewBox = root
+    .getAttribute("viewBox")
+    ?.trim()
+    .split(/\s+/)
+    .map(Number);
+  const viewBoxWidth = viewBox?.[2];
+  const viewBoxHeight = viewBox?.[3];
+  const width = viewBoxWidth !== undefined && Number.isFinite(viewBoxWidth) && viewBoxWidth > 0 ? viewBoxWidth : 1_200;
+  const height =
+    viewBoxHeight !== undefined && Number.isFinite(viewBoxHeight) && viewBoxHeight > 0 ? viewBoxHeight : 800;
+  const rasterWidth = Math.min(3_200, Math.max(1_800, Math.ceil(width * 2)));
+  const rasterHeight = Math.ceil((height / width) * rasterWidth);
+
+  root.setAttribute("xmlns", "http://www.w3.org/2000/svg");
+  root.setAttribute("width", String(width));
+  root.setAttribute("height", String(height));
+
+  const canvas = window.document.createElement("canvas");
+  canvas.width = rasterWidth;
+  canvas.height = rasterHeight;
+  const context = canvas.getContext("2d");
+  if (!context) {
+    throw new Error("Canvas rendering is unavailable.");
+  }
+
+  context.fillStyle = "#ffffff";
+  context.fillRect(0, 0, rasterWidth, rasterHeight);
+
+  const { Canvg } = await import("canvg");
+  const renderer = Canvg.fromString(context, new XMLSerializer().serializeToString(root), {
+    DOMParser,
+    ignoreAnimation: true,
+    ignoreMouse: true,
+  });
+  await renderer.render({
+    ignoreAnimation: true,
+    ignoreMouse: true,
+    ignoreClear: true,
+    ignoreDimensions: true,
+    scaleWidth: rasterWidth,
+    scaleHeight: rasterHeight,
+  });
+
+  return canvas.toDataURL("image/png");
+}
+
+function withTimeout<T>(promise: Promise<T>, timeoutMs: number): Promise<T> {
   return new Promise((resolve, reject) => {
-    const parsedDocument = new DOMParser().parseFromString(svg, "image/svg+xml");
-    const root = parsedDocument.documentElement;
-    if (root.localName === "parsererror") {
-      reject(new Error("The Mermaid SVG is invalid."));
-      return;
-    }
-    const viewBox = root
-      .getAttribute("viewBox")
-      ?.trim()
-      .split(/\s+/)
-      .map(Number);
-    const viewBoxWidth = viewBox?.[2];
-    const viewBoxHeight = viewBox?.[3];
-    const width = viewBoxWidth !== undefined && Number.isFinite(viewBoxWidth) && viewBoxWidth > 0 ? viewBoxWidth : 1_200;
-    const height =
-      viewBoxHeight !== undefined && Number.isFinite(viewBoxHeight) && viewBoxHeight > 0 ? viewBoxHeight : 800;
-    const rasterWidth = Math.min(3_200, Math.max(1_800, Math.ceil(width * 2)));
-    const rasterHeight = Math.ceil((height / width) * rasterWidth);
-
-    root.setAttribute("xmlns", "http://www.w3.org/2000/svg");
-    root.setAttribute("width", String(width));
-    root.setAttribute("height", String(height));
-
-    const source = new XMLSerializer().serializeToString(root);
-    const sourceUrl = URL.createObjectURL(new Blob([source], { type: "image/svg+xml;charset=utf-8" }));
-    const image = new Image();
-
-    image.onload = () => {
-      const canvas = window.document.createElement("canvas");
-      canvas.width = rasterWidth;
-      canvas.height = rasterHeight;
-      const context = canvas.getContext("2d");
-
-      if (!context) {
-        URL.revokeObjectURL(sourceUrl);
-        reject(new Error("Canvas rendering is unavailable."));
-        return;
-      }
-
-      context.fillStyle = "#ffffff";
-      context.fillRect(0, 0, rasterWidth, rasterHeight);
-      context.drawImage(image, 0, 0, rasterWidth, rasterHeight);
-      URL.revokeObjectURL(sourceUrl);
-      resolve(canvas.toDataURL("image/png"));
-    };
-    image.onerror = () => {
-      URL.revokeObjectURL(sourceUrl);
-      reject(new Error("The Mermaid SVG could not be rasterized."));
-    };
-    image.src = sourceUrl;
+    const timeout = window.setTimeout(() => reject(new Error("Diagram rendering timed out.")), timeoutMs);
+    promise.then(
+      (value) => {
+        window.clearTimeout(timeout);
+        resolve(value);
+      },
+      (error: unknown) => {
+        window.clearTimeout(timeout);
+        reject(error);
+      },
+    );
   });
 }
 
@@ -140,48 +154,70 @@ export function MermaidDiagram({ code }: { code: string }) {
 
 export function MermaidRasterDiagram({
   code,
-  onReady,
+  onStatus,
 }: {
   code: string;
-  onReady: (ready: boolean) => void;
+  onStatus: (status: "preparing" | "ready" | "error") => void;
 }) {
   const reactId = useId();
   const [png, setPng] = useState("");
+  const [fallbackSvg, setFallbackSvg] = useState("");
   const [error, setError] = useState("");
 
   useEffect(() => {
     let active = true;
+    let renderedSvg = "";
     const id = `mermaid-print-${reactId.replace(/:/g, "")}`;
     setPng("");
+    setFallbackSvg("");
     setError("");
-    onReady(false);
+    onStatus("preparing");
 
-    void renderMermaid(code, id, true)
-      .then(svgToPng)
+    void withTimeout(
+      renderMermaid(code, id, true).then((svg) => {
+        renderedSvg = svg;
+        return svgToPng(svg);
+      }),
+      10_000,
+    )
       .then((rendered) => {
         if (active) {
           setPng(rendered);
-          onReady(true);
+          onStatus("ready");
         }
       })
       .catch(() => {
         if (active) {
-          setError("Architecture diagram could not be rendered.");
-          onReady(false);
+          if (renderedSvg) {
+            setFallbackSvg(renderedSvg);
+            onStatus("ready");
+          } else {
+            setError("Architecture diagram could not be rendered.");
+            onStatus("error");
+          }
         }
       });
 
     return () => {
       active = false;
     };
-  }, [code, onReady, reactId]);
+  }, [code, onStatus, reactId]);
 
   if (error) return <p className="print-mermaid-error">{error}</p>;
-  if (!png) return <p className="print-mermaid-loading">Preparing architecture diagram…</p>;
+  if (!png && !fallbackSvg) return <p className="print-mermaid-loading">Preparing architecture diagram…</p>;
 
   return (
     <figure className="print-mermaid-figure">
-      <img src={png} alt="System architecture diagram" />
+      {png ? (
+        <img src={png} alt="System architecture diagram" />
+      ) : (
+        <div
+          className="print-mermaid-fallback"
+          role="img"
+          aria-label="System architecture diagram"
+          dangerouslySetInnerHTML={{ __html: fallbackSvg }}
+        />
+      )}
       <figcaption>Generated architecture overview</figcaption>
     </figure>
   );

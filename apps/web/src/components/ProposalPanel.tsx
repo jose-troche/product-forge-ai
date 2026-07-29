@@ -54,7 +54,9 @@ function download(name: string, content: string, type: string) {
   URL.revokeObjectURL(url);
 }
 
-function ExportMenu({ project, printReady }: { project: Project; printReady: boolean }) {
+type PrintDiagramStatus = "preparing" | "ready" | "error";
+
+function ExportMenu({ project, printStatus }: { project: Project; printStatus: PrintDiagramStatus }) {
   const [open, setOpen] = useState(false);
   const proposal = project.proposal;
   if (!proposal) return null;
@@ -87,10 +89,15 @@ function ExportMenu({ project, printReady }: { project: Project; printReady: boo
       action: () => download(`${slug}-architecture.mmd`, proposal.artifacts.mermaid, "text/plain"),
     },
     {
-      label: printReady ? "Complete PDF / print" : "Preparing PDF…",
+      label:
+        printStatus === "ready"
+          ? "Complete PDF / print"
+          : printStatus === "error"
+            ? "PDF diagram unavailable"
+            : "Preparing PDF…",
       icon: Printer,
       action: () => window.print(),
-      disabled: !printReady,
+      disabled: printStatus !== "ready",
     },
   ];
 
@@ -163,10 +170,10 @@ function ProposalContent({ proposal, section }: { proposal: Proposal; section: P
 
 function CompletePrintView({
   proposal,
-  onDiagramReady,
+  onDiagramStatus,
 }: {
   proposal: Proposal;
-  onDiagramReady: (ready: boolean) => void;
+  onDiagramStatus: (status: PrintDiagramStatus) => void;
 }) {
   return (
     <div className="print-complete">
@@ -197,7 +204,7 @@ function CompletePrintView({
       </section>
       <section className="mb-8 break-before-page break-inside-avoid-page">
         <h2 className="mb-3 font-serif text-3xl text-black">Architecture diagram</h2>
-        <MermaidRasterDiagram code={proposal.artifacts.mermaid} onReady={onDiagramReady} />
+        <MermaidRasterDiagram code={proposal.artifacts.mermaid} onStatus={onDiagramStatus} />
       </section>
     </div>
   );
@@ -214,7 +221,7 @@ export function ProposalPanel({
 }) {
   const [activeTab, setActiveTab] = useState<ProposalSection["id"]>("executive");
   const [raw, setRaw] = useState(false);
-  const [printDiagramReady, setPrintDiagramReady] = useState(false);
+  const [printDiagramStatus, setPrintDiagramStatus] = useState<PrintDiagramStatus>("preparing");
   const proposal = project?.proposal ?? null;
   const section = useMemo(
     () => proposal?.sections.find((candidate) => candidate.id === activeTab) ?? proposal?.sections[0],
@@ -286,7 +293,7 @@ export function ProposalPanel({
             <Button variant="secondary" size="icon" onClick={() => setRaw((value) => !value)} title="Toggle raw JSON">
               {raw ? <FileText className="size-4" /> : <Code2 className="size-4" />}
             </Button>
-            <ExportMenu project={project} printReady={printDiagramReady} />
+            <ExportMenu project={project} printStatus={printDiagramStatus} />
           </div>
         </div>
       </div>
@@ -316,7 +323,7 @@ export function ProposalPanel({
       <div className="screen-proposal-content min-h-0 flex-1 overflow-y-auto px-5 py-6">
         {raw ? <CodePreview code={JSON.stringify(project, null, 2)} language="Structured agent output · JSON" /> : <ProposalContent proposal={proposal} section={section} />}
       </div>
-      <CompletePrintView proposal={proposal} onDiagramReady={setPrintDiagramReady} />
+      <CompletePrintView proposal={proposal} onDiagramStatus={setPrintDiagramStatus} />
     </div>
   );
 }

@@ -1,5 +1,7 @@
 # I Didn’t Want Another AI Chatbot. I Wanted to Understand How AI Teams Work.
 
+Product Forge AI is an AI-powered product-planning workspace that turns a raw idea into a structured proposal in under two minutes. It coordinates specialists across market, product, UX, architecture, data, security, delivery, metrics, and risk, then validates and synthesizes their work into one coherent plan.
+
 The idea behind Product Forge AI did not begin with a product-planning problem. It began with a learning question:
 
 **What changes when an AI system stops behaving like one assistant and starts operating like a coordinated team?**
@@ -17,6 +19,8 @@ The user experience is intentionally simple: describe a product idea—“Airbnb
 Behind that experience, however, is the real subject of the project.
 
 An orchestrator decomposes the request and delegates work to specialists: market research, product management, UX, architecture, database design, API design, security, delivery planning, metrics, and risk. Independent tasks fan out and run concurrently. Their results then fan in to a synthesis stage, where they are reconciled into one coherent proposal.
+
+![Product Forge AI multi-agent orchestration architecture](./assets/product-forge-ai-architecture.jpg)
 
 This is not simply several prompts executed at once. Orchestration introduces a new class of engineering concerns:
 
@@ -36,6 +40,8 @@ Adding more agents does not automatically produce better results. Without coordi
 The value comes from the system around the models.
 
 Each Product Forge specialist returns structured data rather than free-form prose. Typed contracts define what an agent must produce, and validation prevents malformed output from silently contaminating later stages. Dependencies are explicit. Independent work runs in parallel to reduce latency. Retries and domain-specific fallbacks allow the workflow to finish even when one specialist fails. The synthesis agent is responsible not for inventing another answer, but for resolving overlaps, maintaining terminology, and assembling the validated contributions.
+
+The architecture also allows each specialist to use a different model. Models can be matched to a task’s domain, reasoning needs, latency, or cost instead of forcing every agent onto one platform-wide choice.
 
 That design reflects a broader principle: **reliable AI applications depend less on a perfect prompt and more on clear boundaries, controlled handoffs, and observable execution.**
 
@@ -83,3 +89,5 @@ The next generation of useful AI systems will not be defined only by stronger mo
 The most interesting question is no longer, “What can one model answer?”
 
 It is, **“What can a well-orchestrated system accomplish reliably?”**
+
+Try [Product Forge AI live](https://product-forge-ai.troche.workers.dev/) with your own idea, or [explore the source on GitHub](https://github.com/jose-troche/product-forge-ai) to see how the orchestration works.
